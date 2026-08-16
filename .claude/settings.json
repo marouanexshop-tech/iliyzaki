@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npm run build)",
+      "Read(//c/Users/Marouane PC/Desktop/landing amlo/**)",
+      "PowerShell(Copy-Item \"C:\\\\Users\\\\Marouane PC\\\\Desktop\\\\JOUD SOUS\\\\image\\\\A4.png\" \"C:\\\\Users\\\\Marouane PC\\\\Desktop\\\\JOUD SOUS\\\\public\\\\products\\\\baqat-almo-3.png\" -Force)"
+    ]
+  }
+}

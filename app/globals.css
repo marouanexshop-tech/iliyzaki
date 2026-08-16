@@ -1,0 +1,345 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme {
+  --breakpoint-2xs: 22.5rem;
+  --breakpoint-xs: 30rem;
+
+  /* AMLO identity. wine-800 and gold-400 are the top bar's colours — leave them alone. */
+  --color-wine-50: #fdf3f5;
+  --color-wine-100: #fbe3e8;
+  --color-wine-700: #5b1526;
+  --color-wine-800: #4a1220;
+  --color-wine-900: #3e0f1b;
+  --color-wine-950: #2c0610;
+
+  --color-gold-300: #f0d191;
+  --color-gold-400: #d9a961;
+  --color-gold-500: #cf9526;
+
+  --color-cream-50: #fdfaf6;
+  --color-cream-100: #faf4ec;
+  --color-cream-200: #f2e7d8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-cairo);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-cairo), Arial, Helvetica, sans-serif;
+}
+
+/*
+ * Announcement bar marquee. The track holds two identical copies of the
+ * messages, so translating it exactly -50% lands copy 2 where copy 1 began —
+ * the loop restarts on a pixel-identical frame, with no jump.
+ * Duration is set per-instance from the measured width, keeping px/second
+ * constant on every screen. Only transform animates, so it stays on the
+ * compositor.
+ */
+@keyframes marquee-shift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.marquee-track {
+  animation: marquee-shift var(--marquee-duration, 24s) linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/*
+ * Drifting chat/voice glyphs behind the testimonials. Only transform and
+ * opacity animate, so the whole layer stays on the compositor and never
+ * triggers layout. Each particle carries its own distance, tilt, timing and
+ * opacity as custom properties, which is what makes the motion look random
+ * from a single shared keyframe.
+ */
+@keyframes chat-drift {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: var(--chat-opacity, 0.1);
+  }
+  88% {
+    opacity: var(--chat-opacity, 0.1);
+  }
+  100% {
+    transform: translate3d(
+        calc(var(--chat-dx, 0px) * var(--chat-scale, 1)),
+        calc(var(--chat-dy, -120px) * var(--chat-scale, 1)),
+        0
+      )
+      rotate(var(--chat-rot, 0deg));
+    opacity: 0;
+  }
+}
+
+.chat-particle {
+  animation: chat-drift var(--chat-duration, 28s) ease-in-out var(--chat-delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+
+/* Shorter travel on phones — less painting, same feel. */
+@media (max-width: 767px) {
+  .chat-particle {
+    --chat-scale: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-particle {
+    animation: none;
+    opacity: var(--chat-opacity, 0.1);
+  }
+}
+
+/*
+ * Slow gold glint travelling around the "back to home" button.
+ *
+ * The ring is a pseudo-element sized to inset:0 and hollowed out with a mask,
+ * so it paints exactly on the existing 1px edge and changes no box metrics.
+ * The element keeps its own static border underneath, which is what shows if
+ * @property is unavailable — the button is never left borderless.
+ */
+@property --sweep-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes border-sweep {
+  to {
+    --sweep-angle: 360deg;
+  }
+}
+
+.premium-ring {
+  position: relative;
+}
+
+.premium-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--sweep-angle),
+    transparent 0deg,
+    transparent 200deg,
+    var(--color-gold-400) 265deg,
+    var(--color-gold-300) 285deg,
+    transparent 350deg,
+    transparent 360deg
+  );
+  /* Punch out the middle so only the border band remains. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: border-sweep 7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .premium-ring::before {
+    animation: none;
+  }
+}
+
+/*
+ * Floating WhatsApp button: one slow halo expanding out from behind the disc.
+ * Scale and opacity only, so it never triggers layout, and the ring sits in a
+ * pseudo-element behind the button rather than a second DOM node.
+ */
+@keyframes whatsapp-halo {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
+}
+
+.whatsapp-fab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #25d366;
+  z-index: -1;
+  pointer-events: none;
+  animation: whatsapp-halo 2.8s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .whatsapp-fab::before {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/*
+ * Shine sweeping across the disc. The highlight is a gradient painted on an
+ * ::after that carries the same border-radius, so it is clipped to the circle
+ * without an extra DOM node and without overflow:hidden — which would have cut
+ * off the halo above. The gradient image is 2.5x the button's width, so sliding
+ * background-position from 100% to 0% walks the bright band right across the
+ * face and off the other side; at either end the band sits outside the disc, so
+ * the button is clean at rest. Holding still for the first 65% of the cycle is
+ * what keeps this premium rather than a blink.
+ */
+@keyframes whatsapp-shine {
+  0%,
+  65% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+.whatsapp-fab::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+  background-image: linear-gradient(
+    115deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 58%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: 100% 0;
+  animation: whatsapp-shine 4.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .whatsapp-fab::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/*
+ * Swipeable strips that drive themselves. The bar carries no meaning once the
+ * row scrolls on its own, and on a phone it would sit right under the cards.
+ */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Sticky "اطلب الآن" CTA — light sweep plus a slow float.
+ *
+ * The sweep is a gradient on ::after, 2.5x the button's width, moved by
+ * background-position alone: at 100% the bright band sits just off the left
+ * edge, at 0% just off the right, so animating 100% -> 0% walks it left to
+ * right across the face and parks it out of sight at both ends. Percentages
+ * here are physical, so RTL does not flip the direction. overflow:hidden plus
+ * the button's own rounded-full trims the band to the pill; it does not touch
+ * the box-shadow, which is painted outside the padding box.
+ *
+ * Holding still through the first 60% of the cycle is what reads as premium —
+ * a sweep with no pause reads as a blinking banner.
+ */
+@keyframes cta-shine-sweep {
+  0%,
+  60% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+.cta-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.38) 50%,
+    transparent 60%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: 100% 0;
+  animation: cta-shine-sweep 4.2s ease-in-out infinite;
+}
+
+/*
+ * 3px of travel on a compositor-only transform: enough to catch the eye,
+ * small enough that it never crowds the bar's 12px top padding on phones, and
+ * layout is untouched either way so nothing below it can shift.
+ */
+@keyframes cta-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -3px, 0);
+  }
+}
+
+.cta-float {
+  animation: cta-float 3.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta-float {
+    animation: none;
+  }
+
+  .cta-shine::after {
+    animation: none;
+    opacity: 0;
+  }
+}

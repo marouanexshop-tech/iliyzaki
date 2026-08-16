@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "Bash(vercel --version)",
+      "Bash(git config *)",
+      "Bash(echo \"name : $\\(git config --global user.name 2>/dev/null || echo '\\(not set\\)'\\)\")",
+      "Bash(echo \"email: $\\(git config --global user.email 2>/dev/null || echo '\\(not set\\)'\\)\")"
+    ]
+  }
+}
