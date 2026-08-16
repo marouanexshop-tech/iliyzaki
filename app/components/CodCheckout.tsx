@@ -341,7 +341,6 @@ export default function CodCheckout() {
               onChange={handleChange}
               inputMode="tel"
               autoComplete="tel"
-              placeholder="0612345678"
             />
           </div>
 

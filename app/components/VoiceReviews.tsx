@@ -164,7 +164,10 @@ function ReviewCard({
   );
 
   return (
-    <article className="flex w-[292px] shrink-0 snap-center flex-col rounded-[20px] bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.07)] transition-shadow duration-300 hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)] sm:w-[330px]">
+    <article
+      data-review-id={review.id}
+      className="flex w-[292px] shrink-0 snap-center flex-col rounded-[20px] bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.07)] transition-shadow duration-300 hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)] sm:w-[330px]"
+    >
       <div className="flex items-start gap-3">
         <span className="relative size-12 shrink-0 overflow-hidden rounded-full ring-1 ring-slate-200 ring-inset">
           <Image src={review.photo} alt="" fill sizes="48px" className="object-cover" />
@@ -264,6 +267,52 @@ export default function VoiceReviews() {
     });
   }, []);
 
+  /*
+   * Slide away from the note that is playing and it stops.
+   *
+   * Only the playing card is observed, and `root` is the track itself, so the
+   * measurement is "how much of this card is inside the carousel" — nothing
+   * else can trigger it. Scrolling the page vertically, or away from the
+   * section entirely, leaves the card exactly where it is inside the track, so
+   * a listener who scrolls on while listening is never cut off. Re-renders
+   * cannot interrupt it either: the effect only re-runs when playingId itself
+   * changes.
+   *
+   * seen guards the first callback. IntersectionObserver reports current state
+   * as soon as it observes, so a card tapped while it is only half in view —
+   * possible on desktop, where several cards share the track — would otherwise
+   * be paused instantly by the very observer meant to watch it. Pausing waits
+   * until the card has actually been in view once.
+   */
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || !playingId) return;
+
+    const card = track.querySelector(`[data-review-id="${playingId}"]`);
+    if (!card) return;
+
+    let seen = false;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          seen = true;
+          return;
+        }
+        if (!seen) return;
+        const audio = audios.current.get(playingId);
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+        setPlayingId(null);
+      },
+      { root: track, threshold: 0.5 },
+    );
+
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [playingId]);
+
   const scrollByCard = useCallback((direction: 1 | -1) => {
     const track = trackRef.current;
     if (!track) return;
@@ -297,7 +346,9 @@ export default function VoiceReviews() {
         <div className="relative mx-auto mt-8 max-w-6xl">
           <div
             ref={trackRef}
-            className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            /* overscroll-x-contain: without it a swipe past the last card chains
+               out to the page and drags the whole layout sideways. */
+            className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-smooth pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {voiceReviews.map((review) => (
               <ReviewCard
