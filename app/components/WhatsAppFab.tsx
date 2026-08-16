@@ -10,7 +10,7 @@
  * WhatsApp's own page instead of a chat, so it can never land a customer in a
  * conversation with a stranger's number.
  * ------------------------------------------------------------------------- */
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "";
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "212678978749";
 
 /** Pre-filled first message. Leave empty to open a blank chat. */
 const PREFILL = "السلام عليكم، عندي سؤال على الطلبية ديالي.";
