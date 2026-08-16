@@ -45,8 +45,7 @@ export const packs: Pack[] = [
     price: 399,
     badge: null,
     pickerBadge: { text: "اختيار مناسب", tone: "soft" },
-    description:
-      "عسل طبيعي صافي بمذاق غني، مناسب لتحلية يومك وتقوية المناعة بشكل طبيعي.",
+    description: "أملو والمكسرات الطبيعية لتعزيز طاقتك اليومية",
     bundle: {
       lead: LEAD,
       items: [

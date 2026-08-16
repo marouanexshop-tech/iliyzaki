@@ -6,7 +6,7 @@ import Image from "next/image";
  * ------------------------------------------------------------------------- */
 const contact = {
   phone: "", // e.g. "0612345678"
-  email: "", // e.g. "contact@amlo.ma"
+  email: "", // e.g. "contact@example.ma"
   address: "", // e.g. "أكادير، المغرب"
 };
 
@@ -66,7 +66,7 @@ export default function Footer() {
             {/*
              * The brown field is keyed out of the file, so the gold ring reads
              * straight against the wine backdrop with nothing to clip. Sits
-             * exactly where the "AMLO" wordmark did — centred on phones,
+             * exactly where the old wordmark did — centred on phones,
              * start-aligned from md — so the column's alignment and the mt-1.5
              * below are untouched.
              */}
@@ -144,7 +144,7 @@ export default function Footer() {
           )}
 
           <p className="text-[12px] text-white/60">
-            © {new Date().getFullYear()} AMLO — جميع الحقوق محفوظة.
+            © {new Date().getFullYear()} — جميع الحقوق محفوظة.
           </p>
         </div>
       </div>

@@ -115,14 +115,14 @@ export default function SocialProof() {
                 سارة، أمينة
                 <VerifiedIcon />
                 وأكثر من <strong className="font-bold text-wine-950">{CUSTOMERS}</strong> زبون يثقون
-                في AMLO
+                فينا
               </p>
             </div>
           </Reveal>
 
           <Reveal delay={270}>
             <h3 className="mt-6 text-lg font-bold text-wine-950 sm:text-xl">
-              4 أسباب تجعل زبائننا يفضلون AMLO
+              4 أسباب تجعل زبائننا يفضلون منتجاتنا
             </h3>
           </Reveal>
 
