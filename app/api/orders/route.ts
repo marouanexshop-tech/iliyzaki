@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { findPack } from "../../lib/packs";
+import { appendToSheet } from "../../lib/sheet";
 import { hasErrors, validateOrder, type OrderInput } from "../../lib/validation";
 
 export async function POST(request: Request) {
@@ -41,8 +42,21 @@ export async function POST(request: Request) {
     createdAt: new Date().toISOString(),
   };
 
-  // TODO: persist the order — no database, email service or sheet is configured in this project yet.
-  console.info("[order]", order);
+  /*
+   * Awaited, not fired and forgotten: on Vercel the function can be frozen the
+   * moment the response is returned, which would kill an in-flight request and
+   * drop the row.
+   */
+  const delivered = await appendToSheet(order);
+
+  /*
+   * A failed append is logged at error level with the whole order, so nothing
+   * is ever unrecoverable — the row can be re-entered from the Vercel logs. The
+   * customer is still confirmed regardless: this is cash on delivery, and the
+   * shop would rather chase a missing row than lose the sale.
+   */
+  if (delivered) console.info("[order] sheet ok", order.phone);
+  else console.error("[order] sheet failed — recover this row manually", order);
 
   return NextResponse.json({ ok: true, total: pack.price }, { status: 201 });
 }
