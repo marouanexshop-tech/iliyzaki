@@ -39,6 +39,13 @@ export async function POST(request: Request) {
     packId: pack.id,
     packName: pack.name,
     total: pack.price,
+    /*
+     * The checkout has no quantity control — one submission is one pack — so
+     * this is 1 by definition, not a value the customer can send. It is kept
+     * as a field rather than a literal so that adding a quantity selector later
+     * is a change in one place.
+     */
+    quantity: 1,
     currency: "MAD",
     payment: "cod",
     fullName: input.fullName.trim(),
