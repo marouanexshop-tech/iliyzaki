@@ -28,8 +28,12 @@ const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "";
  */
 const PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n");
 
-/** Tab to read and write. */
-const TAB = process.env.GOOGLE_SHEETS_TAB ?? "feuille1 pack";
+/*
+ * Tab to read and write. This is the tab's own name, not the file's — the
+ * spreadsheet is called "pack" but the tab inside it is "Feuille 1", and
+ * pointing at the file name makes every call fail with "Unable to parse range".
+ */
+const TAB = process.env.GOOGLE_SHEETS_TAB ?? "Feuille 1";
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
 
@@ -204,9 +208,17 @@ export async function appendToSheet(order: SheetOrder): Promise<boolean> {
       return false;
     }
 
+    /*
+     * RAW, not USER_ENTERED. USER_ENTERED runs each cell through the same
+     * parser as typing into the grid, which reads "0678978749" as the number
+     * 678978749 and eats the leading zero — every phone number arrives
+     * unusable. RAW stores each value with its JSON type, so the phone stays
+     * the exact string sent and the price, sent as a JS number, is still a
+     * number the sheet can sum.
+     */
     const url =
       `${SHEETS_API}/${SPREADSHEET_ID}/values/${encodeURIComponent(dataRange())}:append` +
-      `?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+      `?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
 
     const response = await fetch(url, {
       method: "POST",
