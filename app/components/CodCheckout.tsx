@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { packs, priceLabel } from "../lib/packs";
+import { track } from "../lib/pixel";
 import {
   hasErrors,
   validateOrder,
@@ -86,12 +87,41 @@ export default function CodCheckout() {
     return () => registerSubmit(null);
   }, [registerSubmit]);
 
+  /*
+   * Read inside the observer without making the observer depend on it —
+   * listing `selected` in the deps would tear down and rebuild the
+   * IntersectionObserver every time the customer picks a different pack.
+   */
+  const selectedRef = useRef(selected);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+
+  const initiateSent = useRef(false);
+
   useEffect(() => {
     const node = formRef.current;
     if (!node) return;
-    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
-      threshold: 0.12,
-    });
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setInView(entry.isIntersecting);
+
+        /* Funnel step: the form actually reached the screen. Once per visit. */
+        if (entry.isIntersecting && !initiateSent.current) {
+          initiateSent.current = true;
+          const pack = selectedRef.current;
+          track("InitiateCheckout", {
+            value: pack.price,
+            currency: "MAD",
+            content_name: pack.name,
+            content_ids: [pack.id],
+            content_type: "product",
+            num_items: 1,
+          });
+        }
+      },
+      { threshold: 0.12 },
+    );
     observer.observe(node);
     return () => observer.disconnect();
   }, [setInView]);
@@ -155,6 +185,27 @@ export default function CodCheckout() {
           if (body?.errors) setErrors(body.errors);
           throw new Error("rejected");
         }
+        /*
+         * Purchase fires here, on the confirmed 201, rather than on
+         * /thank-you. Firing it from that page would count a second sale every
+         * time the customer refreshes it or reopens it from history, which
+         * quietly inflates the numbers Meta optimises against. This path runs
+         * exactly once per accepted order.
+         *
+         * The value is the server's total, not selected.price — the API prices
+         * every order from its own pack table, so this reports what was really
+         * charged even if the client's copy were stale.
+         */
+        const body = (await response.json().catch(() => null)) as { total?: number } | null;
+        track("Purchase", {
+          value: body?.total ?? selected.price,
+          currency: "MAD",
+          content_name: selected.name,
+          content_ids: [selected.id],
+          content_type: "product",
+          num_items: 1,
+        });
+
         setStatus("done");
         router.push("/thank-you");
       } catch {
@@ -162,7 +213,7 @@ export default function CodCheckout() {
         setServerError("تعذّر إرسال الطلب. المرجو المحاولة مرة أخرى.");
       }
     },
-    [buildInput, router, setStatus, status, values],
+    [buildInput, router, selected, setStatus, status, values],
   );
 
   if (status === "done") {
