@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { findPack } from "../../lib/packs";
-import { appendToSheet } from "../../lib/sheet";
+import { appendToSheet, readOrders, sheetConfigured } from "../../lib/sheet";
 import { hasErrors, validateOrder, type OrderInput } from "../../lib/validation";
+
+/* The service-account JWT is signed with node crypto, so not the edge runtime. */
+export const runtime = "nodejs";
+
+/* Orders change on every checkout; a cached GET would serve a stale list. */
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   let body: Partial<OrderInput>;
@@ -59,4 +65,44 @@ export async function POST(request: Request) {
   else console.error("[order] sheet failed — recover this row manually", order);
 
   return NextResponse.json({ ok: true, total: pack.price }, { status: 201 });
+}
+
+/**
+ * Orders as JSON for the admin dashboard, newest first.
+ *
+ * Every row is customer personal data — full name, phone, home address — so
+ * this is gated on a bearer token and fails closed: with ORDERS_API_TOKEN unset
+ * the endpoint refuses rather than serving the list to anyone who guesses the
+ * URL. An open version of this route would publish the shop's entire customer
+ * list to the internet.
+ */
+export async function GET(request: Request) {
+  const expected = process.env.ORDERS_API_TOKEN ?? "";
+  if (!expected) {
+    return NextResponse.json(
+      { error: "orders_api_disabled", hint: "set ORDERS_API_TOKEN to enable" },
+      { status: 503 },
+    );
+  }
+
+  const header = request.headers.get("authorization") ?? "";
+  const supplied = header.startsWith("Bearer ")
+    ? header.slice(7)
+    : (new URL(request.url).searchParams.get("token") ?? "");
+
+  if (supplied !== expected) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  if (!sheetConfigured) {
+    return NextResponse.json({ error: "sheet_not_configured" }, { status: 503 });
+  }
+
+  try {
+    const orders = await readOrders();
+    return NextResponse.json({ ok: true, count: orders.length, orders });
+  } catch (error) {
+    console.error("[orders] read failed", error);
+    return NextResponse.json({ error: "sheet_read_failed" }, { status: 502 });
+  }
 }

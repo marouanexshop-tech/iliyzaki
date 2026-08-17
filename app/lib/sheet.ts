@@ -1,24 +1,36 @@
 /* ---------------------------------------------------------------------------
- * Google Sheet delivery.
+ * Google Sheets, server side only.
  *
- * The site posts each order to an Apps Script web app bound to the sheet, and
- * that script appends the row. It is done this way rather than through the
- * Sheets API because a service account would mean a GCP project, a private key
- * living in the environment, and sharing the sheet with a robot address — for
- * one append per order, a bound script is the smaller moving part and keeps
- * every credential inside the owner's own Google account.
+ * Auth is a service account JWT signed here and exchanged for an access token,
+ * then plain REST calls to the Sheets v4 API. google-auth-library is the whole
+ * dependency — the full googleapis SDK is tens of megabytes and every byte of
+ * it lands in the serverless bundle for two endpoints.
  *
- * Set GOOGLE_SHEET_WEBHOOK_URL to the deployed web app URL. While it is unset
- * nothing is sent and orders are logged instead, so checkout keeps working.
+ * Nothing in this file may be imported from a client component: the private key
+ * lives in the environment and must never reach the browser.
  * ------------------------------------------------------------------------- */
 
-const WEBHOOK_URL = process.env.GOOGLE_SHEET_WEBHOOK_URL ?? "";
+import { JWT } from "google-auth-library";
 
-/* Optional. Only checked when the Apps Script has its own SECRET filled in. */
-const WEBHOOK_SECRET = process.env.GOOGLE_SHEET_WEBHOOK_SECRET ?? "";
+const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID ?? "";
+const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "";
 
-/** Apps Script can be slow to wake; past this the customer waits too long. */
-const TIMEOUT_MS = 8000;
+/*
+ * Vercel stores the key as a single line with literal backslash-n, so the real
+ * newlines have to be put back or the PEM parser rejects it. Pasting a genuine
+ * multi-line value works too — then there is nothing to replace.
+ */
+const PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n");
+
+/** Tab to read and write. Overridable, but this is the one that exists today. */
+const TAB = process.env.GOOGLE_SHEETS_TAB ?? "feuille1 pack";
+
+/** Columns A..N, matching the sheet's header row. */
+const COLUMNS = "A:N";
+
+const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+
+export const sheetConfigured = Boolean(SPREADSHEET_ID && CLIENT_EMAIL && PRIVATE_KEY);
 
 export type SheetOrder = {
   packName: string;
@@ -30,10 +42,59 @@ export type SheetOrder = {
   createdAt: string;
 };
 
+export type StoredOrder = {
+  orderDate: string;
+  fullName: string;
+  phone: string;
+  city: string;
+  productName: string;
+  price: number | null;
+  address: string;
+  callCenterStatus: string;
+  tracking: string;
+  deliveryStatus: string;
+  whatsapp: string;
+  comment: string;
+  agentConfirmation: string;
+  source: string;
+};
+
+/*
+ * A1 notation treats a space as the end of the sheet name, so "feuille1 pack"
+ * has to be wrapped in single quotes or the API reads it as sheet "feuille1"
+ * and fails. Any literal quote inside a tab name doubles, per A1 rules.
+ */
+function range() {
+  return `'${TAB.replace(/'/g, "''")}'!${COLUMNS}`;
+}
+
+/*
+ * One client per warm instance. Building a JWT mints a new access token on
+ * every call otherwise, which is a round trip to Google on the critical path of
+ * every single checkout.
+ */
+let cachedClient: JWT | null = null;
+
+function client() {
+  if (!cachedClient) {
+    cachedClient = new JWT({
+      email: CLIENT_EMAIL,
+      key: PRIVATE_KEY,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+  }
+  return cachedClient;
+}
+
+async function authHeaders() {
+  const { token } = await client().getAccessToken();
+  if (!token) throw new Error("no access token");
+  return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+}
+
 /**
- * Morocco-local timestamp, written as `YYYY-MM-DD HH:mm` so the column both
- * sorts correctly as text and is readable to whoever works the orders. An ISO
- * string with a Z suffix would show UTC, which is an hour off for the team.
+ * Morocco-local timestamp as `YYYY-MM-DD HH:mm`. An ISO string would show UTC,
+ * an hour behind, which is wrong for whoever works the orders.
  */
 function orderDate(iso: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -50,9 +111,9 @@ function orderDate(iso: string) {
 }
 
 /**
- * wa.me needs the international form with no plus. Validation already accepts
- * 06…, 07…, 212… and +212…, so normalise all four to 212XXXXXXXXX and hand the
- * agent a link they can click straight from the sheet.
+ * wa.me wants the international form with no plus. Validation accepts 06…, 07…,
+ * 212… and +212…, so all four normalise to 212XXXXXXXXX and the agent gets a
+ * link they can click straight out of the sheet.
  */
 function whatsappLink(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -65,9 +126,9 @@ function whatsappLink(phone: string) {
 }
 
 /**
- * One row, in the sheet's own column order — A through N. The blanks are the
- * columns the call centre fills in by hand after the fact; they are still sent
- * so every row has the same width and nothing shifts left.
+ * One row in the sheet's own column order, A through N. The blanks are the
+ * columns the call centre fills in by hand; they are still written so every row
+ * has the same width and nothing shifts left.
  */
 export function toRow(order: SheetOrder): (string | number)[] {
   return [
@@ -76,7 +137,7 @@ export function toRow(order: SheetOrder): (string | number)[] {
     order.phone, //                C  Phone
     order.city, //                 D  City
     order.packName, //             E  Product name
-    order.total, //                F  Variant price  (number, so it can be summed)
+    order.total, //                F  Variant price  (number, so it sums)
     order.address, //              G  Address 1
     "", //                         H  Call center status
     "", //                         I  Tracking
@@ -88,25 +149,82 @@ export function toRow(order: SheetOrder): (string | number)[] {
   ];
 }
 
+/** Inverse of toRow, for the admin dashboard endpoint. */
+function fromRow(row: string[]): StoredOrder {
+  const at = (i: number) => (row[i] ?? "").toString().trim();
+  const price = Number(at(5).replace(/[^\d.-]/g, ""));
+  return {
+    orderDate: at(0),
+    fullName: at(1),
+    phone: at(2),
+    city: at(3),
+    productName: at(4),
+    price: Number.isFinite(price) && at(5) !== "" ? price : null,
+    address: at(6),
+    callCenterStatus: at(7),
+    tracking: at(8),
+    deliveryStatus: at(9),
+    whatsapp: at(10),
+    comment: at(11),
+    agentConfirmation: at(12),
+    source: at(13),
+  };
+}
+
 /**
- * Appends the order. Resolves to false rather than throwing: a sheet outage
- * must never cost the shop a cash-on-delivery sale, so the caller confirms the
- * order either way and the row is recovered from the logs.
+ * Appends one order. Resolves false instead of throwing: a Sheets outage must
+ * never cost a cash-on-delivery sale, so the caller confirms either way and the
+ * row is recovered from the logs.
  */
 export async function appendToSheet(order: SheetOrder): Promise<boolean> {
-  if (!WEBHOOK_URL) return false;
-
-  try {
-    const response = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ row: toRow(order), secret: WEBHOOK_SECRET }),
-      // Apps Script answers the POST with a 302 to script.googleusercontent.com.
-      redirect: "follow",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    return response.ok;
-  } catch {
+  if (!sheetConfigured) {
+    console.error("[sheet] not configured — set the Google env vars");
     return false;
   }
+
+  try {
+    const url =
+      `${SHEETS_API}/${SPREADSHEET_ID}/values/${encodeURIComponent(range())}:append` +
+      `?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ values: [toRow(order)] }),
+    });
+
+    if (!response.ok) {
+      // Google's message names the real cause (bad tab, key, or sharing).
+      console.error("[sheet] append failed", response.status, await response.text());
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("[sheet] append threw", error);
+    return false;
+  }
+}
+
+/**
+ * Every order, newest first. The header row is dropped by matching its first
+ * cell rather than by always skipping row 1, so a sheet without headers still
+ * returns all of its data.
+ */
+export async function readOrders(): Promise<StoredOrder[]> {
+  if (!sheetConfigured) throw new Error("sheet not configured");
+
+  const url = `${SHEETS_API}/${SPREADSHEET_ID}/values/${encodeURIComponent(range())}`;
+  const response = await fetch(url, { headers: await authHeaders() });
+
+  if (!response.ok) {
+    throw new Error(`sheets read failed: ${response.status} ${await response.text()}`);
+  }
+
+  const data = (await response.json()) as { values?: string[][] };
+  const rows = data.values ?? [];
+
+  return rows
+    .filter((row) => row.length > 0 && (row[0] ?? "").trim().toLowerCase() !== "order date")
+    .map(fromRow)
+    .reverse();
 }

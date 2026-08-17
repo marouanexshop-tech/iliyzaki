@@ -8,7 +8,18 @@
       "Bash(vercel --version)",
       "Bash(git config *)",
       "Bash(echo \"name : $\\(git config --global user.name 2>/dev/null || echo '\\(not set\\)'\\)\")",
-      "Bash(echo \"email: $\\(git config --global user.email 2>/dev/null || echo '\\(not set\\)'\\)\")"
+      "Bash(echo \"email: $\\(git config --global user.email 2>/dev/null || echo '\\(not set\\)'\\)\")",
+      "Bash(git commit -q -m 'first commit *)",
+      "Bash(git branch *)",
+      "Bash(git remote *)",
+      "Bash(echo \"remote: $\\(git remote get-url origin\\)\")",
+      "Bash(git push *)",
+      "Bash(git ls-remote *)",
+      "Bash(npx next *)",
+      "Bash(grep -vE '^\\\\s*\\\\*|^\\\\s*/\\\\*')",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'Empty phone field, lock horizontal layout, stop audio on slide *)",
+      "Bash(git commit -q -m 'Remove the AMLO wordmark from the site copy *)"
     ]
   }
 }
