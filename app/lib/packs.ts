@@ -23,17 +23,17 @@ export const packs: Pack[] = [
   {
     id: "baqat-almo-1",
     name: "باقة أملو الأصيلة",
-    image: "/products/baqat-almo-2.webp",
-    price: 349,
+    image: "/products/ba9a-2.webp",
+    price: 299,
     badge: null,
     description:
       "باقة مختارة من المكسرات والفواكه الجافة بالعسل، طبيعية 100% وغنية بالطاقة اللي كتحتاجها كل يوم.",
     bundle: {
       lead: LEAD,
       items: [
-        "مكسرات بالعسل / حجم كبير",
         "أملو كاوكاو بزيت الزيتون / حجم كبير",
-        "أملو لوز بزيت أركان / حجم صغير",
+        "مكسرات بالعسل / حجم متوسط",
+        "أملو لوز بزيت أركان / حجم متوسط",
         "كريمة الكاجو / حجم صغير",
       ],
     },
@@ -41,17 +41,17 @@ export const packs: Pack[] = [
   {
     id: "baqat-almo-2",
     name: "باقة أملو الفاخرة",
-    image: "/products/baqat-almo-1.webp",
-    price: 399,
+    image: "/products/ba9a-1.webp",
+    price: 339,
     badge: null,
     pickerBadge: { text: "اختيار مناسب", tone: "soft" },
     description: "أملو والمكسرات الطبيعية لتعزيز طاقتك اليومية",
     bundle: {
       lead: LEAD,
       items: [
-        "أملو كاوكاو بزيت الزيتون / حجم كبير",
         "مكسرات بالعسل / حجم كبير",
-        "أملو لوز بزيت أركان / حجم كبير",
+        "مكسرات بالعسل / حجم صغير",
+        "أملو لوز بزيت أركان / حجم متوسط",
         "كريمة الكاجو / حجم صغير",
       ],
     },
