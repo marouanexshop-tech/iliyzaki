@@ -23,12 +23,12 @@ const slides = [
  */
 const mobileSlides = [
   {
-    src: "/slider/slider-mobile-1.webp",
-    alt: "منتجات مغربية بجودة عالية وأسعار مناسبة",
+    src: "/slider/mobile-fakhira.webp",
+    alt: "باقة أملو الفاخرة",
   },
   {
-    src: "/slider/slider-mobile-2.webp",
-    alt: "تقويات المناعة وزيادة الطاقة اليومية بشكل طبيعي",
+    src: "/slider/mobile-asila.webp",
+    alt: "باقة أملو الأصيلة",
   },
 ];
 
@@ -97,19 +97,16 @@ export default function HeroSlider() {
       className="relative w-full overflow-hidden"
     >
       {/*
-       * The two phone creatives are not the same shape — 1024×1280 and
-       * 960×1280 — so the taller 3/4 is used as the frame and object-contain
-       * fits each one inside it whole. Cover would have shaved ~3% off the
-       * edges of the 4:5 slide, which is where its price badge sits. The cost
-       * is a thin band above and below that slide; the frame is wine-950 so it
-       * reads as part of the design rather than as a gap.
+       * Both phone creatives are square (1080×1080), so the frame matches them
+       * exactly; object-contain is kept so a future off-shape creative is never
+       * cropped, and the wine-950 frame hides any band that would leave.
        */}
       <Track
         items={mobileSlides}
         active={active}
         fit="object-contain"
         sizes="(min-width: 768px) 1px, 100vw"
-        className="relative aspect-[3/4] w-full bg-wine-950 md:hidden"
+        className="relative aspect-square w-full bg-wine-950 md:hidden"
       />
 
       {/* Desktop track, unchanged: source aspect 1672×941, cover, full width. */}
